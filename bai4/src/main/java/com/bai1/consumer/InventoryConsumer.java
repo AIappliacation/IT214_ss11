@@ -1,5 +1,6 @@
 package com.bai1.consumer;
 
+import com.bai1.config.KafkaTopicConfig;
 import com.bai1.dto.OrderEvent;
 import com.bai1.service.InventoryService;
 import org.slf4j.Logger;
@@ -22,14 +23,17 @@ public class InventoryConsumer {
     }
 
     /**
-     * Lắng nghe đơn đặt hàng mới từ topic "order-events"
-     * Khi cấu hình DefaultErrorHandler + DeadLetterPublishingRecoverer + ErrorHandlingDeserializer:
-     * - Nếu message lỗi JSON cú pháp (thiếu }), deserializer bọc lỗi và chuyển cho error handler retry 3 lần rồi đưa sang DLQ.
-     * - Nếu method ném RuntimeException (lỗi nghiệp vụ, db timeout), error handler retry 3 lần rồi đưa sang DLQ.
-     * - Consumer không bị kẹt, partition offset được commit và chuyển sang message tiếp theo.
+     * BÀI TẬP 4: LẮNG NGHE ĐƠN ĐẶT HÀNG TẠI INVENTORY-SERVICE
+     * - Topic: storex-order-events
+     * - GroupId: inventory-group
+     * - Kịch bản lỗi:
+     *   1. Kiện hàng bị lỗi định dạng JSON (thiếu dấu '}') -> ErrorHandlingDeserializer bẫy lỗi.
+     *   2. Đơn hàng chứa mã sản phẩm không tồn tại (productId: null) -> ném ngoại lệ IllegalArgumentException.
+     * - Khi ném Exception: DefaultErrorHandler sẽ retry tối đa 3 lần, mỗi lần cách nhau 2 giây.
+     * - Nếu sau 3 lần vẫn lỗi -> Tự động loại bỏ khỏi partition chính và đẩy sang storex-order-events.DLQ.
      */
     @KafkaListener(
-            topics = "order-events",
+            topics = KafkaTopicConfig.STOREX_ORDER_EVENTS_TOPIC,
             groupId = "inventory-group",
             containerFactory = "kafkaListenerContainerFactory"
     )
@@ -39,13 +43,20 @@ public class InventoryConsumer {
             @Header(KafkaHeaders.RECEIVED_PARTITION) int partition,
             @Header(KafkaHeaders.OFFSET) long offset
     ) {
-        log.info("==> [InventoryConsumer] Đã nhận tin nhắn từ [Topic: {}, Partition: {}, Offset: {}]", 
+        log.info("==> [InventoryConsumer] Đã nhận đơn hàng từ [Topic: {}, Partition: {}, Offset: {}]", 
                 topic, partition, offset);
         log.info("[InventoryConsumer] Dữ liệu đơn hàng: {}", event);
+
+        // Kịch bản đề bài: Đơn hàng chứa mã sản phẩm không tồn tại (productId: null)
+        if (event.getProductId() == null || event.getProductId().trim().isEmpty()) {
+            log.error("[InventoryConsumer] [LỖI NGHIỆP VỤ] Đơn hàng {} có productId: null! Ném ngoại lệ để kích hoạt Retry + DLQ.",
+                    event.getOrderId());
+            throw new IllegalArgumentException("Mã sản phẩm không tồn tại (productId: null) trong đơn hàng " + event.getOrderId());
+        }
 
         // Khấu trừ tồn kho
         inventoryService.deductStock(event.getProductId(), event.getQuantity());
 
-        log.info("<== [InventoryConsumer] Xử lý đơn hàng thành công cho OrderId: {}", event.getOrderId());
+        log.info("<== [InventoryConsumer] Đã trừ kho thành công cho OrderId: {}", event.getOrderId());
     }
 }

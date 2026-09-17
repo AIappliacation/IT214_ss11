@@ -9,25 +9,15 @@ import org.springframework.kafka.config.TopicBuilder;
 public class KafkaTopicConfig {
 
     public static final String STOREX_ORDER_EVENTS_TOPIC = "storex-order-events";
-    public static final String STOREX_ORDER_EVENTS_DLQ_TOPIC = "storex-order-events.DLQ";
 
     /**
-     * Topic chính nhận sự kiện đặt hàng từ Order Service (5 Partitions)
+     * Topic storex-order-events được cấu hình có 5 Partitions
+     * Giải quyết BUG-03: Phải cấu hình số partition phù hợp và sử dụng orderId làm Key
+     * để các sự kiện cùng 1 đơn hàng luôn phân tuyến vào cùng 1 Partition.
      */
     @Bean
     public NewTopic storexOrderEventsTopic() {
         return TopicBuilder.name(STOREX_ORDER_EVENTS_TOPIC)
-                .partitions(5)
-                .replicas(1)
-                .build();
-    }
-
-    /**
-     * Topic Dead Letter Queue (DLQ) chứa các đơn hàng bị lỗi sau khi đã thử lại (retry) 3 lần thất bại
-     */
-    @Bean
-    public NewTopic storexOrderEventsDlqTopic() {
-        return TopicBuilder.name(STOREX_ORDER_EVENTS_DLQ_TOPIC)
                 .partitions(5)
                 .replicas(1)
                 .build();

@@ -1,23 +1,46 @@
 server:
-  port: 8080
+  port: 8083
 
 spring:
   application:
-    name: order-service
+    name: storex-consumer-service
 
   kafka:
     bootstrap-servers: localhost:9092
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JacksonJsonSerializer
+    consumer:
+      auto-offset-reset: earliest
+      enable-auto-commit: true
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      properties:
+        spring.json.trusted.packages: "*"
 
-feign:
-  client:
-    config:
-      default:
-        connectTimeout: 5000
-        readTimeout: 5000
-  circuitbreaker:
-    enabled: true
+# ====================================================================
+# GIẢI QUYẾT LỖI BUG-04: KHẮC PHỤC LỖI CẠNH TRANH GROUP-ID
+# Lập trình viên không được đặt chung group-id="storex-system"!
+# Để đạt cơ chế Fan-Out (Publish-Subscribe) cả Kho và Loyalty nhận 100% data:
+# Phải cấu hình 2 group-id hoàn toàn độc lập:
+# ====================================================================
 
-promotion:
-  service:
-    url: http://promotion-service
-    timeout: 2000 # 2 seconds
+# 1. Nhóm dịch vụ Kho hàng (Inventory Service)
+inventory:
+  kafka:
+    consumer:
+      group-id: inventory-group # Group ID riêng biệt
+      concurrency: 3            # Scale 3 instances/threads chia đều tải 5 partitions (~33% mỗi instance)
+
+# 2. Nhóm dịch vụ Điểm thưởng thành viên (Loyalty Service)
+loyalty:
+  kafka:
+    consumer:
+      group-id: loyalty-group   # Group ID riêng biệt nhận đủ 100% đơn hàng
+      concurrency: 1
+
+logging:
+  level:
+    root: INFO
+    com.bai1: INFO
+    org.springframework.kafka: INFO

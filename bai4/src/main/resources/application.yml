@@ -17,7 +17,12 @@ spring:
       properties:
         spring.deserializer.key.delegate.class: org.apache.kafka.common.serialization.StringDeserializer
         spring.deserializer.value.delegate.class: org.springframework.kafka.support.serializer.JsonDeserializer
+        # ====================================================================
+        # GIẢI QUYẾT LỖI BUG-05: The class is not in the trusted packages
+        # Cho phép deserialize mọi package từ JSON vào Java Object
+        # ====================================================================
         spring.json.trusted.packages: "*"
+        trusted.packages: "*"
         spring.json.value.default.type: com.bai1.dto.OrderEvent
         spring.json.use.type.headers: false
 

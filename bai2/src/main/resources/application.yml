@@ -7,12 +7,14 @@ spring:
 
   kafka:
     bootstrap-servers: localhost:9092
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JacksonJsonSerializer
+      acks: all
+      retries: 3
 
-feign:
-  client:
-    config:
-      default:
-        connectTimeout: 5000
-        readTimeout: 5000
-  circuitbreaker:
-    enabled: true
+logging:
+  level:
+    root: INFO
+    com.bai1: DEBUG
+    org.springframework.kafka: INFO

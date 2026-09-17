@@ -1,5 +1,6 @@
 package com.bai1.consumer;
 
+import com.bai1.config.KafkaTopicConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.kafka.annotation.KafkaListener;
@@ -14,16 +15,13 @@ public class DeadLetterQueueConsumer {
     private static final Logger log = LoggerFactory.getLogger(DeadLetterQueueConsumer.class);
 
     /**
-     * Lắng nghe các message bị lỗi chuyển về Dead Letter Queue (Topic: order-events.DLT)
-     * Sau khi retry tối đa 3 lần thất bại, message sẽ được đưa vào đây.
-     * Tại đây, hệ thống có thể:
-     * 1. Ghi log cảnh báo mức ERROR / ALERT cho đội ngũ vận hành.
-     * 2. Lưu tin nhắn lỗi vào Database (bảng dlq_audit_log).
-     * 3. Bắn thông báo qua Slack/Telegram/PagerDuty.
-     * 4. Cung cấp API cho phép replay/reprocess sau khi sửa dữ liệu.
+     * BÀI TẬP 4: DEAD LETTER QUEUE (DLQ) LISTENER
+     * - Topic: storex-order-events.DLQ
+     * - GroupId: inventory-dlq-group
+     * - Lắng nghe các thông điệp bị lỗi sau khi đã thử lại 3 lần thất bại.
      */
     @KafkaListener(
-            topics = "order-events.DLT",
+            topics = KafkaTopicConfig.STOREX_ORDER_EVENTS_DLQ_TOPIC,
             groupId = "inventory-dlq-group"
     )
     public void consumeDeadLetterQueue(
@@ -36,12 +34,12 @@ public class DeadLetterQueueConsumer {
             @Header(value = KafkaHeaders.DLT_ORIGINAL_OFFSET, required = false) Long originalOffset,
             @Header(value = KafkaHeaders.DLT_EXCEPTION_MESSAGE, required = false) String exceptionMessage
     ) {
-        log.error("==================== [DEAD LETTER QUEUE (DLQ) ALERT] ====================");
-        log.error("Phát hiện message thất bại sau khi đã retry tối đa 3 lần!");
-        log.error("DLQ Topic: {}, Partition: {}, Offset: {}", topic, partition, offset);
-        log.error("Nguyên bản - Topic: {}, Partition: {}, Offset: {}", originalTopic, originalPartition, originalOffset);
-        log.error("Nguyên nhân lỗi (Exception Message): {}", exceptionMessage);
-        log.error("Nội dung payload bị lỗi: {}", payload);
-        log.error("=========================================================================");
+        log.error("==================== [DEAD LETTER QUEUE (DLQ) TIẾP NHẬN] ====================");
+        log.error("Xác nhận: Đã tiếp nhận đơn hàng bị lỗi vào hộp thư chết DLQ!");
+        log.error("DLQ Vị trí: [Topic: {}, Partition: {}, Offset: {}]", topic, partition, offset);
+        log.error("Nguồn gốc thất bại: [Topic: {}, Partition: {}, Offset: {}]", originalTopic, originalPartition, originalOffset);
+        log.error("Nguyên nhân lỗi (Exception): {}", exceptionMessage);
+        log.error("Payload đơn hàng: {}", payload);
+        log.error("=============================================================================");
     }
 }
